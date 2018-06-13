@@ -18,12 +18,11 @@
             EventHubClient client, int randomSeed, AsyncConsole console, CancellationToken cancellationToken)
         {
 
-            if(pathList.Count()==0)
+            if(pathList == null)
             {
                 throw new ArgumentException($"files does not exist");
             }
         
-
             if (factory == null)
             {
                 throw new ArgumentNullException(nameof(factory));
@@ -117,7 +116,7 @@
                 throw new ArgumentException("rideDataFilePath must be provided");
             }
 
-            if (Directory.GetFiles(rideDataFilePath).Count()==0)
+            if (Directory.GetFiles(rideDataFilePath).Length==0)
             {
                 throw new ArgumentException($"Ride data files at {rideDataFilePath} does not exist");
             }
@@ -127,13 +126,10 @@
                 throw new ArgumentException("fareDataFilePath must be provided");
             }
 
-            if (Directory.GetFiles(fareDataFilePath).Count()==0)
+            if (Directory.GetFiles(fareDataFilePath).Length==0)
             {
                 throw new ArgumentException($"Fare data files at  {fareDataFilePath} does not exist");
             }
-
-
-
 
             return (rideConnectionString, fareConnectionString, rideDataFilePath, fareDataFilePath, numberOfMillisecondsToRun);
         }
@@ -178,9 +174,6 @@
         }
         public static async Task<int> Main(string[] args)
         {
-
-            
-
             try
             {
                 var arguments = ParseArguments();
@@ -199,8 +192,6 @@
                     e.Cancel = true;
                 };
            
-
-                Console.WriteLine(arguments.FareDataFilePath);
                 var rideDataFiles = from file in Directory.EnumerateFiles(arguments.RideDataFilePath)
                                     orderby   Int32.Parse(Path.GetFileName(file).Split("_")[2].ToString().Split(".")[0].ToString()) ascending
                                     select file;
