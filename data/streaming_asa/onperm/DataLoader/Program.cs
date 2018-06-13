@@ -102,6 +102,12 @@
             var fareDataFilePath = Environment.GetEnvironmentVariable("FARE_DATA_FILE_PATH"); 
             var numberOfMillisecondsToRun = (int.TryParse(Environment.GetEnvironmentVariable("SECONDS_TO_RUN"), out int temp) ? temp : 0) * 1000;
 
+
+
+            rideConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=1VxG9DoBDA7jxxAkff2rBwemr7GdfF3iXNBHAC5QlAU=;EntityPath=streamstartpersecond";
+            fareConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=YfVB6xJNl68uR0Cu3/O++160snebGb89ZXGwwWSGfOM=;EntityPath=eventhub1";
+            rideDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\rideData";
+            fareDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\fareData";
             if (string.IsNullOrWhiteSpace(rideConnectionString))
             {
                 throw new ArgumentException("rideConnectionString must be provided");
@@ -202,11 +208,11 @@
 
                 Console.WriteLine(arguments.FareDataFilePath);
                 var rideDataFiles = from file in Directory.EnumerateFiles(arguments.RideDataFilePath)
-                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[1].ToString().Split(".")[0].ToString()) ascending
+                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[2].ToString().Split(".")[0].ToString()) ascending
                                     select file;
 
                  var fareDataFiles = from file in Directory.EnumerateFiles(arguments.FareDataFilePath)
-                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[1].ToString().Split(".")[0].ToString()) ascending
+                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[2].ToString().Split(".")[0].ToString()) ascending
                                     select file ;
 
                 AsyncConsole console = new AsyncConsole(cts.Token);
