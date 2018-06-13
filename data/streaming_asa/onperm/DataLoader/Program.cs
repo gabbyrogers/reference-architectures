@@ -102,6 +102,11 @@
             var numberOfMillisecondsToRun = (int.TryParse(Environment.GetEnvironmentVariable("SECONDS_TO_RUN"), out int temp) ? temp : 0) * 1000;
             
 
+            // rideConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=1VxG9DoBDA7jxxAkff2rBwemr7GdfF3iXNBHAC5QlAU=;EntityPath=streamstartpersecond";
+            // fareConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=YfVB6xJNl68uR0Cu3/O++160snebGb89ZXGwwWSGfOM=;EntityPath=eventhub1";
+            // rideDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\rideData";
+            // fareDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\fareData";
+
 
             if (string.IsNullOrWhiteSpace(rideConnectionString))
             {
@@ -118,7 +123,7 @@
                 throw new ArgumentException("rideDataFilePath must be provided");
             }
 
-            if (Directory.GetFiles(rideDataFilePath).Length==0)
+            if (Directory.GetFiles(rideDataFilePath).Length == 0)
             {
                 throw new ArgumentException($"Ride data files at {rideDataFilePath} does not exist");
             }
@@ -128,7 +133,7 @@
                 throw new ArgumentException("fareDataFilePath must be provided");
             }
 
-            if (Directory.GetFiles(fareDataFilePath).Length==0)
+            if (Directory.GetFiles(fareDataFilePath).Length == 0)
             {
                 throw new ArgumentException($"Fare data files at  {fareDataFilePath} does not exist");
             }
@@ -204,9 +209,9 @@
 
                 AsyncConsole console = new AsyncConsole(cts.Token);
                
-                var rideTask = ReadData<TaxiRide>(rideDataFiles.ToArray(),   
+                var rideTask = ReadData<TaxiRide>(rideDataFiles.ToList(),   
                     TaxiRide.FromString, rideClient, 100, console, cts.Token);
-                var fareTask = ReadData<TaxiFare>(fareDataFiles.ToArray(),
+                var fareTask = ReadData<TaxiFare>(fareDataFiles.ToList(),
                     TaxiFare.FromString, fareClient, 200, console, cts.Token);
                 await Task.WhenAll(rideTask, fareTask, console.WriterTask);
             
