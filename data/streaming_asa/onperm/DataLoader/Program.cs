@@ -14,18 +14,15 @@
 
     class Program
     {
-        private static async Task ReadData<T>(string path, Func<string, T> factory,
+        private static async Task ReadData<T>(IList<string> pathList, Func<string, T> factory,
             EventHubClient client, int randomSeed, AsyncConsole console, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                throw new ArgumentException($"{nameof(path)} cannot be null, empty, or only whitespace");
-            }
 
-            if (!File.Exists(path))
+            if(pathList.Count()==0)
             {
-                throw new ArgumentException($"File '{path}' does not exist");
+                throw new ArgumentException($"files does not exist");
             }
+        
 
             if (factory == null)
             {
@@ -42,64 +39,67 @@
                 throw new ArgumentNullException(nameof(console));
             }
 
-            string typeName = typeof(T).Name;
-            Random random = new Random(randomSeed);
-            ZipArchive archive = new ZipArchive(
-                File.OpenRead(path),
-                ZipArchiveMode.Read);
-            //Console.WriteLine(archive.Entries.Count);
-            foreach (var entry in archive.Entries)
+            foreach (var path in pathList)
             {
-                using (var reader = new StreamReader(entry.Open()))
+                string typeName = typeof(T).Name;
+                Random random = new Random(randomSeed);
+                ZipArchive archive = new ZipArchive(
+                    File.OpenRead(path),
+                    ZipArchiveMode.Read);
+                //Console.WriteLine(archive.Entries.Count);
+                foreach (var entry in archive.Entries)
                 {
-                    int lines = 0;
-                    var batches = reader.ReadLines()
-                        .Skip(1)
-                        .Select(s => {
-                            lines++;
-                            return new EventData(Encoding.UTF8.GetBytes(
-							    JsonConvert.SerializeObject(factory(s))));
-                        })
-                        .Partition();
-                    int i = 0;
-                    foreach (var batch in batches)
+                    using (var reader = new StreamReader(entry.Open()))
                     {
-                        // Wait for a random interval to introduce some delays.
-                        await Task.Delay(random.Next(100, 1000))
-                            .ConfigureAwait(false);
-                        await client.SendAsync(batch)
-                            .ConfigureAwait(false);
-                        if (++i % 10 == 0)
+                        int lines = 0;
+                        var batches = reader.ReadLines()
+                            .Skip(1)
+                            .Select(s => {
+                                lines++;
+                                return new EventData(Encoding.UTF8.GetBytes(
+                                    JsonConvert.SerializeObject(factory(s))));
+                            })
+                            .Partition();
+                        int i = 0;
+                        foreach (var batch in batches)
                         {
-                            await console.WriteLine($"{typeName} lines consumed: {lines}")
+                            // Wait for a random interval to introduce some delays.
+                            await Task.Delay(random.Next(100, 1000))
                                 .ConfigureAwait(false);
-                            await console.WriteLine($"Created {i} {typeName} batches")
+                            await client.SendAsync(batch)
                                 .ConfigureAwait(false);
+                            if (++i % 10 == 0)
+                            {
+                                await console.WriteLine($"{typeName} lines consumed: {lines}")
+                                    .ConfigureAwait(false);
+                                await console.WriteLine($"Created {i} {typeName} batches")
+                                    .ConfigureAwait(false);
+                            }
+
+                            if (cancellationToken.IsCancellationRequested)
+                            {
+                                break;
+                            }
                         }
 
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            break;
-                        }
+                        await console.WriteLine($"Created {i} total {typeName} batches")
+                            .ConfigureAwait(false);
                     }
-
-                    await console.WriteLine($"Created {i} total {typeName} batches")
-                        .ConfigureAwait(false);
                 }
             }
         }
 
         private static (string RideConnectionString,
                         string FareConnectionString,
-                        string RideDataFile,
-                        string FareDataFile,
+                        string RideDataFilePath,
+                        string FareDataFilePath,
                         int MillisecondsToRun) ParseArguments()
         {
 
             var rideConnectionString = Environment.GetEnvironmentVariable("RIDE_EVENT_HUB");
             var fareConnectionString = Environment.GetEnvironmentVariable("FARE_EVENT_HUB");
-            var rideDataFile = Environment.GetEnvironmentVariable("RIDE_DATA_FILE");
-            var fareDataFile = Environment.GetEnvironmentVariable("FARE_DATA_FILE"); 
+            var rideDataFilePath = Environment.GetEnvironmentVariable("RIDE_DATA_FILE_PATH");
+            var fareDataFilePath = Environment.GetEnvironmentVariable("FARE_DATA_FILE_PATH"); 
             var numberOfMillisecondsToRun = (int.TryParse(Environment.GetEnvironmentVariable("SECONDS_TO_RUN"), out int temp) ? temp : 0) * 1000;
 
             if (string.IsNullOrWhiteSpace(rideConnectionString))
@@ -112,27 +112,30 @@
                 throw new ArgumentException("rideConnectionString must be provided");
             }
 
-            if (string.IsNullOrWhiteSpace(rideDataFile))
+            if (string.IsNullOrWhiteSpace(rideDataFilePath))
             {
-                throw new ArgumentException("rideDataFile must be provided");
+                throw new ArgumentException("rideDataFilePath must be provided");
             }
 
-            if (!File.Exists(rideDataFile))
+            if (Directory.GetFiles(rideDataFilePath).Count()==0)
             {
-                throw new ArgumentException($"Ride data file {rideDataFile} does not exist");
+                throw new ArgumentException($"Ride data files at {rideDataFilePath} does not exist");
             }
 
-            if (string.IsNullOrWhiteSpace(fareDataFile))
+            if (string.IsNullOrWhiteSpace(fareDataFilePath))
             {
-                throw new ArgumentException("fareDataFile must be provided");
+                throw new ArgumentException("fareDataFilePath must be provided");
             }
 
-            if (!File.Exists(fareDataFile))
+            if (Directory.GetFiles(fareDataFilePath).Count()==0)
             {
-                throw new ArgumentException($"Fare data file {fareDataFile} does not exist");
+                throw new ArgumentException($"Fare data files at  {fareDataFilePath} does not exist");
             }
 
-            return (rideConnectionString, fareConnectionString, rideDataFile, fareDataFile, numberOfMillisecondsToRun);
+
+
+
+            return (rideConnectionString, fareConnectionString, rideDataFilePath, fareDataFilePath, numberOfMillisecondsToRun);
         }
 
         private class AsyncConsole
@@ -175,6 +178,9 @@
         }
         public static async Task<int> Main(string[] args)
         {
+
+            
+
             try
             {
                 var arguments = ParseArguments();
@@ -192,12 +198,23 @@
                     cts.Cancel();
                     e.Cancel = true;
                 };
+           
+                var rideDataFiles = from file in Directory.EnumerateFiles(arguments.RideDataFilePath)
+                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[1].ToString().Split(".")[0].ToString()) ascending
+                                    select file;
+
+                 var fareDataFiles = from file in Directory.EnumerateFiles(arguments.FareDataFilePath)
+                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[1].ToString().Split(".")[0].ToString()) ascending
+                                    select file ;
+
                 AsyncConsole console = new AsyncConsole(cts.Token);
-                var rideTask = ReadData<TaxiRide>(arguments.RideDataFile,
+               
+                var rideTask = ReadData<TaxiRide>(rideDataFiles.ToArray(),   
                     TaxiRide.FromString, rideClient, 100, console, cts.Token);
-                var fareTask = ReadData<TaxiFare>(arguments.FareDataFile,
+                var fareTask = ReadData<TaxiFare>(fareDataFiles.ToArray(),
                     TaxiFare.FromString, fareClient, 200, console, cts.Token);
                 await Task.WhenAll(rideTask, fareTask, console.WriterTask);
+            
                 Console.WriteLine("Data generation complete");
             }
             catch (ArgumentException ae)
