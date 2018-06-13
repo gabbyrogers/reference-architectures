@@ -199,6 +199,8 @@
                     e.Cancel = true;
                 };
            
+
+                Console.WriteLine(arguments.FareDataFilePath);
                 var rideDataFiles = from file in Directory.EnumerateFiles(arguments.RideDataFilePath)
                                     orderby   Int32.Parse(Path.GetFileName(file).Split("_")[1].ToString().Split(".")[0].ToString()) ascending
                                     select file;
