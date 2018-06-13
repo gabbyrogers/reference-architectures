@@ -14,7 +14,7 @@
 
     class Program
     {
-        private static async Task ReadData<T>(IList<string> pathList, Func<string, T> factory,
+        private static async Task ReadData<T>(ICollection<string> pathList, Func<string, T> factory,
             EventHubClient client, int randomSeed, AsyncConsole console, CancellationToken cancellationToken)
         {
 
