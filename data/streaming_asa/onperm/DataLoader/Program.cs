@@ -90,22 +90,20 @@
 
         private static (string RideConnectionString,
                         string FareConnectionString,
-                        string RideDataFilePath,
-                        string FareDataFilePath,
+                        String RideDataFilePath,
                         int MillisecondsToRun) ParseArguments()
         {
 
             var rideConnectionString = Environment.GetEnvironmentVariable("RIDE_EVENT_HUB");
             var fareConnectionString = Environment.GetEnvironmentVariable("FARE_EVENT_HUB");
-            var rideDataFilePath = Environment.GetEnvironmentVariable("RIDE_DATA_FILE_PATH");
-            var fareDataFilePath = Environment.GetEnvironmentVariable("FARE_DATA_FILE_PATH"); 
+            var rideDataFilePath = Environment.GetEnvironmentVariable("RIDE_DATA_FILE_PATH"); 
             var numberOfMillisecondsToRun = (int.TryParse(Environment.GetEnvironmentVariable("SECONDS_TO_RUN"), out int temp) ? temp : 0) * 1000;
             
 
             // rideConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=1VxG9DoBDA7jxxAkff2rBwemr7GdfF3iXNBHAC5QlAU=;EntityPath=streamstartpersecond";
             // fareConnectionString = "Endpoint=sb://pnp-asa-eh.servicebus.windows.net/;SharedAccessKeyName=custom;SharedAccessKey=YfVB6xJNl68uR0Cu3/O++160snebGb89ZXGwwWSGfOM=;EntityPath=eventhub1";
-            // rideDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\rideData";
-            // fareDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile\\fareData";
+            // rideDataFilePath = "D:\\reference-architectures\\data\\streaming_asa\\onperm\\DataFile";
+    
 
 
             if (string.IsNullOrWhiteSpace(rideConnectionString))
@@ -128,17 +126,7 @@
                 throw new ArgumentException($"Ride data files at {rideDataFilePath} does not exist");
             }
 
-            if (string.IsNullOrWhiteSpace(fareDataFilePath))
-            {
-                throw new ArgumentException("fareDataFilePath must be provided");
-            }
-
-            if (Directory.GetFiles(fareDataFilePath).Length == 0)
-            {
-                throw new ArgumentException($"Fare data files at  {fareDataFilePath} does not exist");
-            }
-
-            return (rideConnectionString, fareConnectionString, rideDataFilePath, fareDataFilePath, numberOfMillisecondsToRun);
+            return (rideConnectionString, fareConnectionString, rideDataFilePath, numberOfMillisecondsToRun);
         }
 
         private class AsyncConsole
@@ -199,17 +187,35 @@
                     e.Cancel = true;
                 };
            
-                var rideDataFiles = from file in Directory.EnumerateFiles(arguments.RideDataFilePath)
-                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[2].ToString().Split(".")[0].ToString()) ascending
-                                    select file;
+                var rideDataFiles = Directory.EnumerateFiles(arguments.RideDataFilePath)
+                                    .Where(p => Path.GetFileNameWithoutExtension(p).Contains("trip_data") )
+                                    .OrderBy (p => {
+                                        var temp = Path.GetFileNameWithoutExtension(p);
+                                        Console.WriteLine(temp);
+                                        var temp1 = temp.Substring(temp.LastIndexOf('_') + 1);
+                                        Console.WriteLine(temp1);
+                                        var index = int.TryParse(temp1, out int i) ? i : throw new ArgumentException($"");
+                                        return index;
+                                    }).ToList();
+                                   
 
-                 var fareDataFiles = from file in Directory.EnumerateFiles(arguments.FareDataFilePath)
-                                    orderby   Int32.Parse(Path.GetFileName(file).Split("_")[2].ToString().Split(".")[0].ToString()) ascending
-                                    select file ;
+                 var fareDataFiles = Directory.EnumerateFiles(arguments.RideDataFilePath)
+                                    .Where(p => Path.GetFileNameWithoutExtension(p).Contains("trip_fare") )
+                                    .OrderBy(p => {
+                                        var temp = Path.GetFileNameWithoutExtension(p);
+                                        var temp1 = temp.Substring(temp.LastIndexOf('_') + 1);
+                                        var index = int.TryParse(temp1, out int i) ? i : throw new ArgumentException($"");
+                                        return index;
+                                    }).ToList();
+
+                foreach (var r in rideDataFiles)
+                {
+                    Console.WriteLine(r);
+                }
 
                 AsyncConsole console = new AsyncConsole(cts.Token);
                
-                var rideTask = ReadData<TaxiRide>(rideDataFiles.ToList(),   
+                var rideTask = ReadData<TaxiRide>(rideDataFiles,   
                     TaxiRide.FromString, rideClient, 100, console, cts.Token);
                 var fareTask = ReadData<TaxiFare>(fareDataFiles.ToList(),
                     TaxiFare.FromString, fareClient, 200, console, cts.Token);
